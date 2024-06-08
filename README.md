@@ -1,18 +1,18 @@
 # E-Commerce_REST_API
 
-This project is an e-commerce backend solution that implements a REST API for handling various e-commerce functionalities, including user management, product management, shopping carts, and orders. It is built using Node.js and Express for the server-side logic, PostgreSQL for data storage, and employs Passport.js for authentication.
+This project is a comprehensive backend solution for an e-commerce platform, designed to facilitate seamless online shopping experiences. It features a RESTful API that supports various e-commerce operations, including user management, product listings, shopping carts, and order processing.
 
 ## Overview
 
-The architecture of this project is designed to support scalable e-commerce applications. It uses Node.js and Express for creating RESTful endpoints, PostgreSQL for storing data, and integrates Passport.js for handling user authentication. The project structure is modular, with separate files for database configurations, route definitions, authentication strategies, and middleware.
+The architecture employs Node.js and Express for the server-side logic, with PostgreSQL as the data persistence layer. It leverages Passport.js for authentication, bcrypt for password hashing, and JSON Web Tokens for session management. The project is organized into modular components, including database configurations, route definitions, and middleware, ensuring a clean and maintainable codebase.
 
 ## Features
 
-- User registration and authentication
-- Product management (CRUD operations)
-- Shopping cart functionality
-- Order processing
-- REST API documentation with Swagger
+- User registration and login
+- Product creation, retrieval, update, and deletion
+- Shopping cart management
+- Order placement and history retrieval
+- RESTful API endpoints documented with Swagger
 
 ## Getting started
 
