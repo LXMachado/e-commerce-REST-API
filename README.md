@@ -32,4 +32,3 @@ The architecture employs Node.js and Express for the server-side logic, with Pos
 
 ### License
 
-Copyright (c) 2024.
