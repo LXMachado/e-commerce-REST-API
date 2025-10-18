@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS products (
 -- Create Carts Table
 CREATE TABLE IF NOT EXISTS carts (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id)
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 -- Create Cart Items Table
@@ -31,8 +31,10 @@ CREATE TABLE IF NOT EXISTS cart_items (
     cart_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
-    FOREIGN KEY (cart_id) REFERENCES carts (id),
-    FOREIGN KEY (product_id) REFERENCES products (id)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (cart_id, product_id),
+    FOREIGN KEY (cart_id) REFERENCES carts (id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
 );
 
 -- Create Orders Table
@@ -42,7 +44,7 @@ CREATE TABLE IF NOT EXISTS orders (
     total_price DECIMAL(10, 2) NOT NULL,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id)
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 -- Create Order Items Table
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price_at_purchase DECIMAL(10, 2) NOT NULL,
-    FOREIGN KEY (order_id) REFERENCES orders (id),
-    FOREIGN KEY (product_id) REFERENCES products (id)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
 );
