@@ -1,108 +1,152 @@
-// Import express
 const express = require('express');
-// Import dotenv to load environment variables
 require('dotenv').config();
-// Import dependencies for authentication
+const session = require('express-session');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+
 const initializePassport = require('./passport-config');
 const db = require('./db');
-// Import product routes
 const productRoutes = require('./routes/products');
-// Import cart routes
 const cartRoutes = require('./routes/cart');
-// Import order routes
 const orderRoutes = require('./routes/orders');
-// Import checkout routes
 const checkoutRoutes = require('./routes/checkout');
-// Initialize express app
-const app = express();
-// Import session for session handling
-const session = require('express-session');
-// Import swagger-ui-express and the Swagger document
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger/swagger.json');
 
-// Serve static files
-app.use(express.static('public'));
+const app = express();
 
-// Middleware to parse JSON bodies
-app.use(express.json());
-// Initialize passport
-app.use(passport.initialize());
-// Configure passport
 initializePassport(passport);
 
-// Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET, // INPUT_REQUIRED {Add a strong random value as SESSION_SECRET.}
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: !process.env.DEV_ENV } // INPUT_REQUIRED {Set DEV_ENV in your .env file depending on your environment.}
-}));
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionSecret = process.env.SESSION_SECRET || 'change-me-in-production';
+const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET || 'replace-this-access-token-secret';
 
-// Simple GET route to '/ping' that returns a 200 status code with a message 'pong'
-app.get('/ping', (req, res) => {
-    console.log("Received request on '/ping' endpoint");
-    res.status(200).send('pong');
+if (!process.env.SESSION_SECRET) {
+  console.warn('SESSION_SECRET is not set. Falling back to a weak development secret. Update your .env file before deploying.');
+}
+
+if (!process.env.ACCESS_TOKEN_SECRET) {
+  console.warn('ACCESS_TOKEN_SECRET is not set. Falling back to a weak development secret. Update your .env file before deploying.');
+}
+
+app.use(express.static('public'));
+app.use(express.json());
+
+app.use(
+  session({
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      httpOnly: true,
+    },
+  }),
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('/ping', (_req, res) => {
+  res.status(200).send('pong');
 });
 
-// User registration route
 app.post('/register', async (req, res) => {
-    try {
-        const { username, email, password } = req.body;
-        const hashedPassword = await bcrypt.hash(password, 10);
-        // Check if user already exists
-        const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-        if (existingUser.rows.length) {
-            console.log(`Registration attempt failed: User already exists with email ${email}`);
-            return res.status(400).send('User already exists with this email.');
-        }
-        // Insert new user
-        await db.query('INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)', [username, email, hashedPassword]);
-        console.log(`User ${username} registered successfully.`);
-        res.status(201).send('User registered successfully.');
-    } catch (error) {
-        console.error('Error registering new user:', error.stack);
-        res.status(500).send('Error registering user.');
+  try {
+    const { username, email, password } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Username, email, and password are required.' });
     }
+
+    const existingUser = await db.query('SELECT id FROM users WHERE email = $1 OR username = $2', [email, username]);
+    if (existingUser.rows.length) {
+      return res.status(409).json({ message: 'An account with the supplied username or email already exists.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUserResult = await db.query(
+      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
+      [username, email, hashedPassword],
+    );
+    const newUser = newUserResult.rows[0];
+
+    await db.query('INSERT INTO carts (user_id) VALUES ($1)', [newUser.id]);
+
+    res.status(201).json({ id: newUser.id, username: newUser.username, email: newUser.email });
+  } catch (error) {
+    console.error('Error registering new user:', error.stack);
+    res.status(500).json({ message: 'Error registering user.' });
+  }
 });
 
-// User login route
-app.post('/login', passport.authenticate('local', { session: false }), (req, res) => {
-    try {
-        const user = { id: req.user.id, username: req.user.username };
-        const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
-        console.log(`User ${req.user.username} logged in successfully.`);
-        res.json({ accessToken: accessToken });
-    } catch (error) {
-        console.error('Error logging in user:', error.stack);
-        res.status(500).send('Error logging in.');
+app.post('/login', (req, res, next) => {
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      console.error('Error logging in user:', err.stack);
+      return next(err);
     }
+
+    if (!user) {
+      return res.status(401).json({ message: info?.message || 'Invalid credentials.' });
+    }
+
+    req.login(user, (loginError) => {
+      if (loginError) {
+        console.error('Error establishing session for user:', loginError.stack);
+        return next(loginError);
+      }
+
+      const sessionUser = { id: user.id, username: user.username };
+      req.session.user = sessionUser;
+      const accessToken = jwt.sign(sessionUser, accessTokenSecret, { expiresIn: '1h' });
+
+      return res.json({ accessToken, user: sessionUser });
+    });
+  })(req, res, next);
 });
 
-// Use product routes
+app.post('/logout', (req, res) => {
+  const destroySession = () => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session during logout:', err.stack);
+        return res.status(500).json({ message: 'Unable to log out.' });
+      }
+
+      return res.status(204).send();
+    });
+  };
+
+  if (typeof req.logout === 'function') {
+    req.logout((logoutError) => {
+      if (logoutError) {
+        console.error('Error clearing passport session during logout:', logoutError.stack);
+        return res.status(500).json({ message: 'Unable to log out.' });
+      }
+
+      destroySession();
+    });
+  } else {
+    destroySession();
+  }
+});
+
 app.use('/products', productRoutes);
-
-// Use cart routes
 app.use('/cart', cartRoutes);
-
-// Use order routes
 app.use('/orders', orderRoutes);
-
-// Use checkout routes
 app.use('/checkout', checkoutRoutes);
-
-// Serve Swagger docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-// Define the port to listen on
-const PORT = process.env.PORT || 3000; // Specify the server port in your .env file or it will default to 3000
+const PORT = process.env.PORT || 3000;
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-}).on('error', (error) => {
-    console.error(`Failed to start server on port ${PORT}:`, error.stack);
+const server = app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
+
+server.on('error', (error) => {
+  console.error(`Failed to start server on port ${PORT}:`, error.stack);
+});
+
