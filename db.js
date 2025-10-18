@@ -1,29 +1,27 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Database connection pool configuration
+const dbPort = Number(process.env.DB_PORT || 5432);
+const useSSL = process.env.DB_SSL === 'true';
+
 const pool = new Pool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT, // Specify the database port in your .env file, typically 5432 for PostgreSQL
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: dbPort,
+  ssl: useSSL ? { rejectUnauthorized: false } : undefined,
 });
 
-// Function to query the database
 const query = async (text, params) => {
-    try {
-        console.log(`Executing query: ${text}`);
-        const res = await pool.query(text, params);
-        console.log('Query executed successfully');
-        return res;
-    } catch (err) {
-        console.error('Error executing query:', err.stack);
-        throw err;
-    }
+  try {
+    return await pool.query(text, params);
+  } catch (err) {
+    console.error('Error executing query:', err.stack);
+    throw err;
+  }
 };
 
-// Export the query function for use in other parts of the application
 module.exports = {
-    query,
+  query,
 };

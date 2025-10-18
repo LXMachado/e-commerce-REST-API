@@ -1,34 +1,67 @@
-# E-Commerce_REST_API
+# E-Commerce REST API
 
-This project is a comprehensive backend solution for an e-commerce platform, designed to facilitate seamless online shopping experiences. It features a RESTful API that supports various e-commerce operations, including user management, product listings, shopping carts, and order processing.
-
-## Overview
-
-The architecture employs Node.js and Express for the server-side logic, with PostgreSQL as the data persistence layer. It leverages Passport.js for authentication, bcrypt for password hashing, and JSON Web Tokens for session management. The project is organized into modular components, including database configurations, route definitions, and middleware, ensuring a clean and maintainable codebase.
+This project is a backend service for an e-commerce platform. It exposes a RESTful API that supports user management, product ca
+talog operations, shopping cart workflows, order placement, and a transactional checkout process backed by PostgreSQL.
 
 ## Features
 
-- User registration and login
-- Product creation, retrieval, update, and deletion
-- Shopping cart management
-- Order placement and history retrieval
-- RESTful API endpoints documented with Swagger
+- User registration, login, logout, and session-backed authentication
+- Product creation, retrieval, update, and deletion endpoints
+- Shopping cart management with automatic cart creation during user registration
+- Order placement, status updates, and history retrieval
+- Checkout endpoint that converts a cart into a completed order inside a database transaction
+- API documentation served through Swagger UI at `/api-docs`
 
-## Getting started
+## Getting Started
 
 ### Requirements
 
-- Node.js
-- PostgreSQL
-- Git
+- Node.js 18+
+- PostgreSQL 13+
+- npm
 
-### Quickstart
+### Installation
 
 1. Clone the repository.
-2. Install dependencies with `npm install`.
-3. Set up the PostgreSQL database and update the `.env` file with your database credentials.
-4. Run the SQL scripts in `db/init_db.sql` to create the necessary tables.
+2. Install dependencies with `npm install` (this will recreate `package-lock.json`).
+3. Create a PostgreSQL database and user, then run the SQL migrations in `db/init_db.sql`.
+4. Copy `.env.example` to `.env` and fill in the required values.
 5. Start the server with `npm start`.
+6. Access the Swagger documentation at `http://localhost:3000/api-docs`.
 
-### License
+### Environment Variables
 
+Create a `.env` file using the template below.
+
+```bash
+PORT=3000
+NODE_ENV=development
+SESSION_SECRET=super-secret-session-key
+ACCESS_TOKEN_SECRET=super-secret-access-token-key
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=ecommerce
+DB_PASSWORD=changeme
+DB_NAME=ecommerce
+DB_SSL=false
+```
+
+## Testing
+
+Run a quick syntax check on the main entry point:
+
+```bash
+npm test
+```
+
+## Project Structure
+
+- `index.js` – Express application bootstrap, authentication routes, and middleware configuration
+- `routes/` – Feature-specific route handlers for products, carts, orders, and checkout
+- `db/` – Database helper and SQL schema definitions
+- `swagger/` – Swagger/OpenAPI documentation served via Swagger UI
+- `public/` – Static assets served by Express
+
+## License
+
+ISC
