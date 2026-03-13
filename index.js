@@ -3,6 +3,7 @@ require('dotenv').config();
 const session = require('express-session');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const initializePassport = require('./passport-config');
@@ -21,6 +22,8 @@ initializePassport(passport);
 const isProduction = process.env.NODE_ENV === 'production';
 const sessionSecret = process.env.SESSION_SECRET || 'change-me-in-production';
 const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET || 'replace-this-access-token-secret';
+const sessionCookieDomain = process.env.SESSION_COOKIE_DOMAIN || 'localhost';
+const sessionDurationMs = Number(process.env.SESSION_DURATION_MS || 1000 * 60 * 60 * 8);
 
 if (!process.env.SESSION_SECRET) {
   console.warn('SESSION_SECRET is not set. Falling back to a weak development secret. Update your .env file before deploying.');
@@ -35,19 +38,51 @@ app.use(express.json());
 
 app.use(
   session({
+    name: 'ecsid',
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: isProduction,
+      secure: true,
       sameSite: isProduction ? 'none' : 'lax',
       httpOnly: true,
+      domain: sessionCookieDomain,
+      path: '/',
+      expires: new Date(Date.now() + sessionDurationMs),
+      maxAge: sessionDurationMs,
     },
   }),
 );
 
+const csrfProtection = (req, res, next) => {
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(req.method)) {
+    if (!req.session.csrfToken) {
+      req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    }
+    return next();
+  }
+
+  const requestToken = req.get('x-csrf-token') || req.body?._csrf;
+  if (requestToken && requestToken === req.session.csrfToken) {
+    return next();
+  }
+
+  return res.status(403).json({ message: 'Invalid CSRF token.' });
+};
+
+app.use(csrfProtection);
+
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.get('/csrf-token', (req, res) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+  }
+
+  res.status(200).json({ csrfToken: req.session.csrfToken });
+});
 
 app.get('/ping', (_req, res) => {
   res.status(200).send('pong');
@@ -147,6 +182,6 @@ const server = app.listen(PORT, () => {
 });
 
 server.on('error', (error) => {
-  console.error(`Failed to start server on port ${PORT}:`, error.stack);
+  console.error('Failed to start server on port %s:', PORT, error.stack);
 });
 

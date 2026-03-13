@@ -21,7 +21,7 @@ module.exports = function passportConfig(passport) {
         const { password_hash, ...safeUser } = user;
         return done(null, safeUser);
       } catch (error) {
-        console.error(`Error during authentication for user ${username}:`, error.stack);
+        console.error('Error during authentication for user %s:', username, error.stack);
         return done(error);
       }
     }),
@@ -41,7 +41,7 @@ module.exports = function passportConfig(passport) {
       const { password_hash, ...safeUser } = userQuery.rows[0];
       return done(null, safeUser);
     } catch (error) {
-      console.error(`Error during deserialization for user ID ${id}:`, error.stack);
+      console.error('Error during deserialization for user ID %s:', id, error.stack);
       return done(error);
     }
   });
